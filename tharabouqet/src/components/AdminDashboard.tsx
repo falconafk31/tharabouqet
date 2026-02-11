@@ -5,7 +5,7 @@ import { Promo, Product, Testimonial, Category, StoreSetting } from '@/types';
 import imageCompression from 'browser-image-compression'; 
 import { 
   LogOut, Plus, Trash2, X, Image as ImageIcon, Loader2, 
-  ShoppingBag, Megaphone, MessageSquareQuote, MinusCircle, Pencil, UploadCloud, Calculator, Layers, Settings, Save
+  ShoppingBag, Megaphone, MessageSquareQuote, MinusCircle, Pencil, UploadCloud, Calculator, Layers, Settings, Save, MapPin, Clock, Share2, Phone
 } from 'lucide-react';
 
 // --- UI COMPONENTS ---
@@ -40,8 +40,16 @@ export default function AdminDashboard() {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   
-  // Settings State
-  const [settings, setSettings] = useState<Record<string, string>>({});
+  // Settings State (Default structure)
+  const [settings, setSettings] = useState<Record<string, string>>({
+    whatsapp_number: '',
+    instagram_url: '',
+    tiktok_url: '',
+    address_line1: '',
+    address_line2: '',
+    hours_weekdays: '',
+    hours_weekends: ''
+  });
 
   // Form States
   const [promoForm, setPromoForm] = useState({ title: '', subtitle: '', image_url: '', button_text: 'Lihat Promo', button_link: '#products', discount: '' });
@@ -72,13 +80,12 @@ export default function AdminDashboard() {
         }
     }
     
-    // Map settings array to object for easier access
     if (settingsData) {
         const settingsMap: Record<string, string> = {};
         settingsData.forEach((item: StoreSetting) => {
             settingsMap[item.key] = item.value;
         });
-        setSettings(settingsMap);
+        setSettings(prev => ({...prev, ...settingsMap}));
     }
 
     setLoading(false);
@@ -101,7 +108,7 @@ export default function AdminDashboard() {
     setUploadStatus('');
   };
 
-  // --- HANDLERS ---
+  // --- HELPER: PRICE CALC ---
   const handlePriceCalculation = (field: 'original' | 'percent', value: string) => {
     let newOriginal = field === 'original' ? value : productForm.original_price;
     let newPercent = field === 'percent' ? value : productForm.temp_discount_percent;
@@ -125,6 +132,7 @@ export default function AdminDashboard() {
     }
   };
 
+  // --- HANDLERS ---
   const handleLogout = async () => {
     if (confirm('Apakah Anda yakin ingin keluar?')) {
       await supabase.auth.signOut();
@@ -237,15 +245,17 @@ export default function AdminDashboard() {
     setIsSubmitting(false); if (!error) { resetForms(); fetchData(); } else alert(error.message);
   };
 
-  // NEW: Submit Settings
+  // Submit Settings (Looping Upsert)
   const submitSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Upsert whatsapp number (insert or update if exists)
-    const { error } = await supabase
-      .from('store_settings')
-      .upsert({ key: 'whatsapp_number', value: settings.whatsapp_number });
+    const updates = Object.keys(settings).map(key => ({
+        key, 
+        value: settings[key]
+    }));
+
+    const { error } = await supabase.from('store_settings').upsert(updates);
 
     setIsSubmitting(false);
     if (!error) {
@@ -272,11 +282,20 @@ export default function AdminDashboard() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap gap-3 mb-8">
-          <button onClick={() => { setActiveTab('promos'); resetForms(); }} className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'promos' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}><Megaphone size={16}/> Promo</button>
-          <button onClick={() => { setActiveTab('products'); resetForms(); }} className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'products' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}><ShoppingBag size={16}/> Product</button>
-          <button onClick={() => { setActiveTab('categories'); resetForms(); }} className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'categories' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}><Layers size={16}/> Category</button>
-          <button onClick={() => { setActiveTab('testimonials'); resetForms(); }} className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'testimonials' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}><MessageSquareQuote size={16}/> Testimoni</button>
-          <button onClick={() => { setActiveTab('settings'); resetForms(); }} className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}><Settings size={16}/> Settings</button>
+          {['promos', 'products', 'categories', 'testimonials', 'settings'].map(tab => (
+             <button 
+                key={tab}
+                onClick={() => { setActiveTab(tab as any); resetForms(); }} 
+                className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 capitalize ${activeTab === tab ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+             >
+                {tab === 'promos' && <Megaphone size={16}/>}
+                {tab === 'products' && <ShoppingBag size={16}/>}
+                {tab === 'categories' && <Layers size={16}/>}
+                {tab === 'testimonials' && <MessageSquareQuote size={16}/>}
+                {tab === 'settings' && <Settings size={16}/>}
+                {tab}
+             </button>
+          ))}
         </div>
 
         {activeTab !== 'settings' && (
@@ -292,31 +311,59 @@ export default function AdminDashboard() {
         {activeTab === 'settings' && (
             <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100 mb-8 animate-fade-in-down">
                 <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2"><Settings className="text-slate-500"/> Pengaturan Toko</h2>
-                <form onSubmit={submitSettings} className="max-w-md">
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Nomor WhatsApp Admin</label>
-                        <p className="text-xs text-gray-500 mb-2">Format: Kode Negara + Nomor (Tanpa '+'). Contoh: 6281234567890</p>
-                        <input 
-                            value={settings.whatsapp_number || ''} 
-                            onChange={e => setSettings({...settings, whatsapp_number: e.target.value})} 
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-rose-500 outline-none" 
-                            placeholder="6281234567890" 
-                            required 
-                        />
+                <form onSubmit={submitSettings} className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-6">
+                        <h3 className="font-bold text-gray-800 border-b pb-2">Kontak & Sosmed</h3>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><Phone size={14}/> Nomor WhatsApp</label>
+                            <input value={settings.whatsapp_number || ''} onChange={e => setSettings({...settings, whatsapp_number: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="6281234567890" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><Share2 size={14}/> Instagram URL</label>
+                            <input value={settings.instagram_url || ''} onChange={e => setSettings({...settings, instagram_url: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="https://instagram.com/..." />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><Share2 size={14}/> TikTok URL</label>
+                            <input value={settings.tiktok_url || ''} onChange={e => setSettings({...settings, tiktok_url: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="https://tiktok.com/..." />
+                        </div>
                     </div>
-                    <button type="submit" disabled={isSubmitting} className="flex items-center gap-2 bg-green-600 text-white px-8 py-3 rounded-xl font-medium hover:bg-green-700 transition shadow-lg shadow-green-100">
-                        {isSubmitting ? <Loader2 className="animate-spin" size={18}/> : <Save size={18} />} 
-                        Simpan Pengaturan
-                    </button>
+
+                    <div className="space-y-6">
+                        <h3 className="font-bold text-gray-800 border-b pb-2">Lokasi & Jam Operasional</h3>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><MapPin size={14}/> Alamat Baris 1</label>
+                            <input value={settings.address_line1 || ''} onChange={e => setSettings({...settings, address_line1: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Jl. Mawar No. 123" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><MapPin size={14}/> Alamat Baris 2</label>
+                            <input value={settings.address_line2 || ''} onChange={e => setSettings({...settings, address_line2: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Jakarta Selatan, 12345" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><Clock size={14}/> Jam Kerja (Weekdays)</label>
+                            <input value={settings.hours_weekdays || ''} onChange={e => setSettings({...settings, hours_weekdays: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Mon - Sat: 09:00 - 17:00" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><Clock size={14}/> Jam Kerja (Weekend)</label>
+                            <input value={settings.hours_weekends || ''} onChange={e => setSettings({...settings, hours_weekends: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Sun: Closed" />
+                        </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                        <button type="submit" disabled={isSubmitting} className="flex items-center justify-center gap-2 bg-green-600 text-white w-full py-4 rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-100">
+                            {isSubmitting ? <Loader2 className="animate-spin" size={20}/> : <Save size={20} />} 
+                            Simpan Pengaturan
+                        </button>
+                    </div>
                 </form>
             </div>
         )}
 
+        {/* Existing Forms and Lists ... (Tidak berubah, hanya dirender ulang) */}
         {showForm && activeTab !== 'settings' && (
           <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100 mb-8 animate-fade-in-down">
-            {/* Promo Form, Product Form, Testimoni Form, Category Form - same as before */}
             {activeTab === 'promos' && (
               <form onSubmit={submitPromo} className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* ... Promo Form Content ... */}
                 <div className="space-y-5">
                   <input value={promoForm.title} onChange={e => setPromoForm({...promoForm, title: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Title" required />
                   <input value={promoForm.subtitle} onChange={e => setPromoForm({...promoForm, subtitle: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Subtitle" required />
@@ -335,6 +382,7 @@ export default function AdminDashboard() {
 
             {activeTab === 'products' && (
               <form onSubmit={submitProduct} className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* ... Product Form Content ... */}
                 <div className="space-y-5">
                   <input value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Product Name" required />
                   <div className="bg-rose-50/50 p-4 rounded-2xl border border-rose-100 grid grid-cols-2 gap-4">
@@ -366,6 +414,7 @@ export default function AdminDashboard() {
 
             {activeTab === 'testimonials' && (
               <form onSubmit={submitTesti} className="space-y-5">
+                {/* ... Testi Form Content ... */}
                 <input value={testiForm.name} onChange={e => setTestiForm({...testiForm, name: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Name" required />
                 <textarea value={testiForm.text} onChange={e => setTestiForm({...testiForm, text: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Review" rows={3} required />
                 <select value={testiForm.rating} onChange={e => setTestiForm({...testiForm, rating: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900">
@@ -379,9 +428,10 @@ export default function AdminDashboard() {
 
             {activeTab === 'categories' && (
                 <form onSubmit={submitCategory} className="flex gap-4 items-end bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                    {/* ... Category Form Content ... */}
                     <div className="flex-1">
                         <label className="block text-sm mb-2 text-gray-700 font-medium">Nama Kategori Baru</label>
-                        <input value={catForm.name} onChange={e => setCatForm({ name: e.target.value })} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-gray-900" placeholder="Contoh: Anniversary" required />
+                        <input value={catForm.name} onChange={e => setCatForm({ name: e.target.value })} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-rose-500 outline-none" placeholder="Contoh: Anniversary" required />
                     </div>
                     <button type="submit" disabled={isSubmitting} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-medium hover:bg-slate-800 transition h-[50px]">{isSubmitting ? '...' : 'Tambah'}</button>
                 </form>
@@ -412,6 +462,7 @@ export default function AdminDashboard() {
                   </div>
                   <h3 className="font-bold text-gray-900 text-lg">{p.name}</h3>
                   <p className="text-rose-600 font-medium mt-1">Rp {p.price.toLocaleString()}</p>
+                  <span className="text-xs bg-gray-100 px-2.5 py-1 rounded-full text-gray-600 mt-3 inline-block border border-gray-200">{p.category}</span>
                   <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition translate-y-2 group-hover:translate-y-0">
                     <button onClick={() => handleEdit(p, 'products')} className="bg-white text-slate-700 p-2.5 rounded-full shadow-md hover:bg-slate-50"><Pencil size={16}/></button>
                     <button onClick={() => handleDelete('products', p.id)} className="bg-white text-red-600 p-2.5 rounded-full shadow-md hover:bg-red-50"><Trash2 size={16}/></button>
