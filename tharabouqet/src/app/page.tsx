@@ -1,8 +1,24 @@
 import { supabase } from '@/lib/supabase'
 import PromoSlider from '@/components/PromoSlider'
 import ProductSection from '@/components/ProductSection'
-import TestimonialSlider from '@/components/TestimonialSlider' // Import komponen baru
+import TestimonialSlider from '@/components/TestimonialSlider' 
 import { Promo, Product, Testimonial, Category } from '@/types'
+import { Metadata } from 'next'
+
+// --- SEO METADATA ---
+export const metadata: Metadata = {
+  title: 'Tharabouqet | Fresh Minimalist Florist & Gifts',
+  description: 'Pesan buket bunga segar, kado wisuda, dan hampers eksklusif dengan desain minimalis modern. Pengiriman cepat area Jakarta & sekitarnya.',
+  keywords: ['florist jakarta', 'buket bunga', 'kado wisuda', 'bunga fresh', 'tharabouqet', 'toko bunga'],
+  openGraph: {
+    title: 'Tharabouqet | Fresh Minimalist Florist',
+    description: 'Rangkaian bunga segar untuk setiap momen spesial Anda.',
+    url: 'https://tharabouqet.vercel.app', 
+    siteName: 'Tharabouqet',
+    locale: 'id_ID',
+    type: 'website',
+  },
+}
 
 export const revalidate = 0 
 
@@ -20,13 +36,13 @@ export default async function Home() {
     .select('*')
     .order('created_at', { ascending: false });
 
-  // 3. Fetch Categories (New)
+  // 3. Fetch Categories
   const { data: categories } = await supabase
     .from('categories')
     .select('*')
     .order('name', { ascending: true });
 
-  // 4. Fetch ALL Testimonials (Removed limit)
+  // 4. Fetch ALL Testimonials
   const { data: testimonials } = await supabase
     .from('testimonials')
     .select('*')

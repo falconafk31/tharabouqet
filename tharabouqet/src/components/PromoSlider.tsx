@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Promo } from '@/types';
+import Image from 'next/image'; // Import Next Image
 
 export default function PromoSlider({ promos }: { promos: Promo[] }) {
   const [current, setCurrent] = useState(0);
@@ -19,38 +20,45 @@ export default function PromoSlider({ promos }: { promos: Promo[] }) {
 
   return (
     <div 
-      className="relative w-full h-[500px] md:h-[600px] overflow-hidden bg-gray-100 mt-16"
+      className="relative w-full h-[500px] md:h-[600px] overflow-hidden bg-gray-100 mt-16 group"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
       <AnimatePresence mode="wait">
         <motion.div
           key={current}
-          initial={{ opacity: 0, scale: 1.05 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.8 }}
           className="absolute inset-0 w-full h-full"
         >
-          {/* Background Image */}
-          <div 
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${promos[current].image_url})` }}
-          />
-          {/* Overlay */}
-          <div className="absolute inset-0 bg-black/30 md:bg-black/20" />
+          {/* OPTIMISASI GAMBAR: Menggunakan next/image */}
+          <div className="absolute inset-0">
+            <Image 
+              src={promos[current].image_url}
+              alt={promos[current].title}
+              fill
+              priority={true} // Wajib true untuk hero image agar loading cepat
+              className="object-cover"
+              sizes="100vw" // Banner selalu selebar layar
+            />
+          </div>
+
+          {/* Overlay Gradient */}
+          <div className="absolute inset-0 bg-black/40" />
           
           {/* Content */}
-          <div className="absolute inset-0 flex items-center justify-center text-center px-4">
+          <div className="absolute inset-0 flex items-center justify-center text-center px-4 z-10">
             <div className="max-w-3xl relative">
               
               {/* DISCOUNT BADGE */}
               {promos[current].discount && (
                 <motion.div
-                  initial={{ y: -50, opacity: 0 }}
+                  initial={{ y: -20, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ delay: 0.5, type: "spring" }}
-                  className="absolute -top-24 md:-top-32 left-1/2 -translate-x-1/2 bg-rose-600 text-white font-bold text-lg md:text-xl px-6 py-2 rounded-full shadow-lg z-20"
+                  className="inline-block mb-4 bg-rose-600 text-white font-bold text-sm md:text-lg px-6 py-2 rounded-full shadow-lg"
                 >
                   {promos[current].discount}
                 </motion.div>
@@ -60,7 +68,7 @@ export default function PromoSlider({ promos }: { promos: Promo[] }) {
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2, duration: 0.6 }}
-                className="text-4xl md:text-6xl font-serif font-bold text-white mb-4 drop-shadow-md"
+                className="text-4xl md:text-6xl font-serif font-bold text-white mb-4 drop-shadow-md leading-tight"
               >
                 {promos[current].title}
               </motion.h2>
@@ -72,26 +80,30 @@ export default function PromoSlider({ promos }: { promos: Promo[] }) {
               >
                 {promos[current].subtitle}
               </motion.p>
-              <a
+              <motion.a
                 href={promos[current].button_link || '#products'}
-                className="inline-block px-8 py-3 bg-white text-gray-900 rounded-full font-medium hover:bg-rose-50 transition transform hover:scale-105 shadow-lg"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.6, duration: 0.6 }}
+                className="inline-block px-8 py-3 bg-white text-gray-900 rounded-full font-medium hover:bg-rose-500 hover:text-white transition-all transform hover:scale-105 shadow-xl"
               >
                 {promos[current].button_text}
-              </a>
+              </motion.a>
             </div>
           </div>
         </motion.div>
       </AnimatePresence>
 
-      {/* Dots */}
-      <div className="absolute bottom-6 left-0 right-0 flex justify-center space-x-3 z-10">
+      {/* Dots Navigation */}
+      <div className="absolute bottom-8 left-0 right-0 flex justify-center space-x-3 z-20">
         {promos.map((_, idx) => (
           <button
             key={idx}
             onClick={() => setCurrent(idx)}
-            className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-              current === idx ? 'bg-white w-8' : 'bg-white/50 hover:bg-white/80'
+            className={`h-2 rounded-full transition-all duration-300 shadow-sm ${
+              current === idx ? 'bg-white w-8' : 'bg-white/50 w-2 hover:bg-white/80'
             }`}
+            aria-label={`Go to slide ${idx + 1}`}
           />
         ))}
       </div>
