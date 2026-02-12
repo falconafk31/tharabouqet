@@ -9,7 +9,7 @@ interface ProductSectionProps {
   categories: Category[];
 }
 
-const ITEMS_PER_PAGE = 10; // Menampilkan 10 produk per halaman
+const ITEMS_PER_PAGE = 10; 
 
 export default function ProductSection({ products, categories }: ProductSectionProps) {
   const [filter, setFilter] = useState('All');
@@ -27,23 +27,24 @@ export default function ProductSection({ products, categories }: ProductSectionP
     setCurrentPage(1);
   }, [filter]);
 
-  // 3. Pagination Logic (Slicing Data)
+  // 3. Pagination Logic
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const currentData = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  const scrollToSection = () => {
-    const section = document.getElementById('products');
-    if (section) section.scrollIntoView({ behavior: 'smooth' });
-  };
-
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
-    scrollToSection(); // Scroll ke atas grid saat ganti halaman
+    // Scroll dengan offset sedikit agar header tidak menutupi
+    const section = document.getElementById('products');
+    if (section) {
+        const yOffset = -100; // Offset untuk header
+        const y = section.getBoundingClientRect().top + window.pageYOffset + yOffset;
+        window.scrollTo({ top: y, behavior: 'smooth' });
+    }
   };
 
   return (
-    <section id="products" className="py-16 md:py-24 bg-white scroll-mt-20">
+    <section id="products" className="py-16 md:py-24 bg-white scroll-mt-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10">
           <h2 className="text-3xl md:text-4xl font-serif font-bold text-gray-900 mb-4">Our Collections</h2>
@@ -52,8 +53,8 @@ export default function ProductSection({ products, categories }: ProductSectionP
           </p>
         </div>
 
-        {/* Category Filter Buttons */}
-        <div className="flex flex-wrap justify-center gap-2 mb-10 sticky top-20 z-30 py-2 bg-white/80 backdrop-blur-md">
+        {/* Category Filter Buttons - Sticky */}
+        <div className="flex flex-wrap justify-center gap-2 mb-10 sticky top-20 z-30 py-2 bg-white/90 backdrop-blur-md rounded-b-xl transition-all">
           {filterOptions.map(cat => (
             <button
               key={cat}
@@ -69,27 +70,31 @@ export default function ProductSection({ products, categories }: ProductSectionP
           ))}
         </div>
 
-        {/* Product Grid - UPDATED: grid-cols-2 for mobile */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6 lg:gap-8">
-          {currentData.map(product => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-        
-        {/* Empty State */}
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-20 bg-gray-50 rounded-3xl mt-4">
-            <p className="text-gray-400">Belum ada produk di kategori {filter}.</p>
+        {/* FIX: Tambahkan min-h (Minimum Height) di sini.
+           Ini mencegah layout 'jumping' saat produk sedikit di halaman terakhir.
+        */}
+        <div className="min-h-[600px]"> 
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6 lg:gap-8">
+            {currentData.map(product => (
+              <ProductCard key={product.id} product={product} />
+            ))}
           </div>
-        )}
+          
+          {/* Empty State */}
+          {filteredProducts.length === 0 && (
+            <div className="text-center py-20 bg-gray-50 rounded-3xl mt-4 flex flex-col items-center justify-center h-[400px]">
+              <p className="text-gray-400">Belum ada produk di kategori {filter}.</p>
+            </div>
+          )}
+        </div>
 
         {/* PAGINATION CONTROLS */}
         {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-4 mt-12">
+          <div className="flex justify-center items-center gap-4 mt-16 pt-8 border-t border-gray-100">
             <button 
               onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="p-3 rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
+              className="p-3 rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm active:scale-95"
             >
               <ChevronLeft size={20} />
             </button>
@@ -101,7 +106,7 @@ export default function ProductSection({ products, categories }: ProductSectionP
             <button 
               onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
-              className="p-3 rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
+              className="p-3 rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm active:scale-95"
             >
               <ChevronRight size={20} />
             </button>
