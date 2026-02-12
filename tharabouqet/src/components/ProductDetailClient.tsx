@@ -3,25 +3,26 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, ChevronLeft, ChevronRight, Loader2, Copy, Facebook, Check, Share2 } from 'lucide-react';
+import { MessageCircle, ChevronLeft, ChevronRight, Loader2, Copy, Facebook, Check, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import OrderModal from '@/components/OrderModal';
+import ProductCard from '@/components/ProductCard';
 import Image from 'next/image';
 
 // --- CUSTOM SOCIAL ICONS ---
-const XIcon = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
+const XIcon = ({ size = 20, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
   </svg>
 );
 
-const TikTokIcon = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
+const TikTokIcon = ({ size = 20, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
   </svg>
 );
 
-const InstagramIcon = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
+const InstagramIcon = ({ size = 20, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
     <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
@@ -29,7 +30,7 @@ const InstagramIcon = ({ size = 20, className = "" }: { size?: number, className
   </svg>
 );
 
-const WhatsAppIcon = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
+const WhatsAppIcon = ({ size = 20, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
   </svg>
@@ -41,7 +42,9 @@ export default function ProductDetailClient({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  
+  // Custom Toast Message State
+  const [toastMsg, setToastMsg] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -63,8 +66,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
       const { data: relatedData } = await supabase
         .from('products')
         .select('*')
-        .neq('id', id)
-        .limit(4);
+        .neq('id', id) 
+        .limit(4);     
       
       if (relatedData) {
         setRelatedProducts(relatedData as Product[]);
@@ -75,6 +78,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
 
     fetchData();
   }, [id]);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(''), 3500); // Sembunyikan setelah 3.5 detik
+  };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-rose-500" /></div>;
   if (!product) return <div className="min-h-screen flex items-center justify-center bg-white text-gray-500">Produk tidak ditemukan</div>;
@@ -91,23 +99,41 @@ export default function ProductDetailClient({ id }: { id: string }) {
 
     if (platform === 'copy') {
       navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      showToast('Link berhasil disalin!');
     } else if (platform === 'facebook') {
       window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
     } else if (platform === 'twitter') {
       window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
     } else if (platform === 'whatsapp') {
       window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
-    } else if (platform === 'instagram') {
-      window.open('https://instagram.com', '_blank');
-    } else if (platform === 'tiktok') {
-      window.open('https://tiktok.com', '_blank');
+    } else if (platform === 'instagram' || platform === 'tiktok') {
+      // Logic Khusus IG & TikTok: Copy Link + Info User
+      navigator.clipboard.writeText(url);
+      const appName = platform === 'instagram' ? 'Instagram' : 'TikTok';
+      showToast(`Link disalin! Silakan paste di aplikasi ${appName}.`);
+      
+      // Delay sedikit sebelum membuka webnya agar user sempat membaca notifikasi
+      setTimeout(() => {
+        window.open(`https://www.${platform}.com/`, '_blank');
+      }, 2000);
     }
   };
 
   return (
-    <main className="min-h-screen bg-white pt-24 pb-20">
+    <main className="min-h-screen bg-white pt-24 pb-20 relative">
+      {/* Toast Notification Element */}
+      <AnimatePresence>
+        {toastMsg && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+            className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm font-medium px-6 py-3 rounded-full flex items-center gap-2 shadow-xl whitespace-nowrap"
+          >
+            <CheckCircle size={18} className="text-green-400" />
+            {toastMsg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Breadcrumb Navigation */}
@@ -122,6 +148,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
           {/* LEFT: IMAGE GALLERY */}
           <div className="space-y-6">
             <div className="relative aspect-square bg-gray-50 rounded-3xl overflow-hidden group border border-gray-100 shadow-sm">
+              {/* DISCOUNT BADGE */}
               {product.discount && (
                 <div className="absolute top-4 left-4 bg-rose-600 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-lg z-20">
                   {product.discount}
@@ -200,6 +227,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
               {product.description}
             </div>
 
+            {/* ACTION BUTTONS */}
             <div className="flex flex-col gap-4 mb-8">
               <button 
                 onClick={() => setIsModalOpen(true)}
@@ -233,15 +261,14 @@ export default function ProductDetailClient({ id }: { id: string }) {
                   <XIcon size={16} />
                 </button>
                 <button onClick={() => handleShare('copy')} className="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-200 transition relative" title="Copy Link">
-                  {copied ? <Check size={18} className="text-green-600"/> : <Copy size={18} />}
+                  {toastMsg.includes('disalin') ? <Check size={18} className="text-green-600"/> : <Copy size={18} />}
                 </button>
               </div>
-              {copied && <p className="text-xs text-green-600 font-medium animate-fade-in mt-2">Link berhasil disalin!</p>}
             </div>
           </div>
         </div>
 
-        {/* RELATED PRODUCTS */}
+        {/* RELATED PRODUCTS SECTION */}
         {relatedProducts.length > 0 && (
           <div className="mt-24 pt-12 border-t border-gray-100">
             <div className="flex items-center justify-between mb-8">
@@ -253,22 +280,14 @@ export default function ProductDetailClient({ id }: { id: string }) {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
               {relatedProducts.map((p) => (
-                <div key={p.id} className="group">
-                  <Link href={`/product/${p.id}`}>
-                    <div className="relative aspect-square overflow-hidden rounded-2xl bg-gray-100 mb-4">
-                      <Image src={p.image_url} alt={p.name} fill className="object-cover group-hover:scale-110 transition duration-500" sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw" />
-                      {p.discount && <span className="absolute top-2 left-2 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg">{p.discount}</span>}
-                    </div>
-                    <h3 className="font-serif font-bold text-gray-900 group-hover:text-rose-600 transition">{p.name}</h3>
-                    <p className="text-rose-600 font-medium text-sm">Rp {p.price.toLocaleString('id-ID')}</p>
-                  </Link>
-                </div>
+                <ProductCard key={p.id} product={p} />
               ))}
             </div>
           </div>
         )}
       </div>
 
+      {/* MODAL ORDER */}
       {product && (
         <OrderModal 
           isOpen={isModalOpen} 
