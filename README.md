@@ -69,7 +69,7 @@ Aplikasi ini dirancang untuk bisnis yang menggunakan sistem pemesanan langsung, 
 - Git
 
 ### 2. Kloning Repositori
-` ` `bash git clone https://github.com/falconkecil31/tharabouqet.git
+` ` `bash git clone https://github.com/falconafk31/tharabouqet.git
 cd tharabouqet
 npm install
 ` ` `
