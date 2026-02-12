@@ -69,8 +69,7 @@ Aplikasi ini dirancang untuk bisnis yang menggunakan sistem pemesanan langsung, 
 - Git
 
 ### 2. Kloning Repositori
-` ` `bash
-git clone https://github.com/falconkecil31/tharabouqet.git
+` ` `bash git clone https://github.com/falconkecil31/tharabouqet.git
 cd tharabouqet
 npm install
 ` ` `
@@ -101,24 +100,6 @@ Buka `http://localhost:3000` di browser Anda untuk melihat toko publik.
 Untuk mengakses dashboard admin, buka `http://localhost:3000/admin`. *(Email dan Password diatur melalui menu Authentication di Supabase)*.
 
 ---
-
-## 📁 Struktur Direktori Utama
-
-` ` `text
-tharabouqet/
-├── src/
-│   ├── app/                 # Next.js App Router (Halaman Utama, Admin, Detail Produk)
-│   ├── components/          # Komponen UI Reusable (Header, Footer, Cards, Modals)
-│   ├── lib/                 # Konfigurasi eksternal (Supabase Client)
-│   └── types/               # TypeScript Interfaces
-├── public/                  # Aset statis
-├── .env.local               # Environment variables (TIDAK DI-COMMIT)
-├── next.config.mjs          # Konfigurasi Next.js & Image Domains
-└── tailwind.config.ts       # Konfigurasi Styling
-` ` `
-
----
-
 ## 📦 Deployment
 
 Proyek ini sangat dioptimalkan untuk di-deploy menggunakan **Vercel**.
