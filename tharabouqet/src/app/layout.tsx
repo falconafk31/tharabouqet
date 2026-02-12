@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import MainLayout from "@/components/MainLayout";
 
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: '--font-serif' });
@@ -20,9 +19,12 @@ export default function RootLayout({
   return (
     <html lang="id" className="scroll-smooth">
       <body className={`${inter.variable} ${playfair.variable} font-sans antialiased bg-white text-slate-800`}>
-        <Header />
-        {children}
-        <Footer />
+      
+        
+        {/* MainLayout menangani kondisional Header/Footer */}
+        <MainLayout>
+            {children}
+        </MainLayout>
       </body>
     </html>
   );
