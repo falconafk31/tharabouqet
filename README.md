@@ -116,5 +116,5 @@ Proyek ini sangat dioptimalkan untuk di-deploy menggunakan **Vercel**.
 Proyek ini didistribusikan di bawah lisensi MIT. Silakan lihat file `LICENSE` untuk informasi lebih lanjut.
 
 <div align="center">
-  <i>Dibuat dengan ❤️ oleh </i>
+  <i>Dibuat dengan ❤️ </i>
 </div>
