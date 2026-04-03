@@ -3,13 +3,22 @@ import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import MainLayout from "@/components/MainLayout";
 
+import { supabase } from "@/lib/supabase";
+
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: '--font-serif' });
 
-export const metadata: Metadata = {
-  title: "Tharabouqet | Fresh Minimalist Florist",
-  description: "Buket bunga segar dengan gaya minimalis modern untuk momen spesial Anda.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { data } = await supabase.from('store_settings').select('key, value');
+  const settings: Record<string, string> = {};
+  data?.forEach(s => settings[s.key] = s.value);
+
+  return {
+    title: settings.seo_title || "Tharabouqet | Fresh Minimalist Florist",
+    description: settings.seo_description || "Buket bunga segar dengan gaya minimalis modern untuk momen spesial Anda.",
+    keywords: settings.seo_keywords || "florist, bouquet, bunga segar, jakarta",
+  };
+}
 
 export default function RootLayout({
   children,

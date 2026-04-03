@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { Dancing_Script } from 'next/font/google';
 import { MapPin } from 'lucide-react';
+import { logClick } from '@/lib/analytics';
 
 const dancingScript = Dancing_Script({ subsets: ['latin'] });
 
@@ -110,6 +111,9 @@ export default function OrderModal({ isOpen, onClose, product }: OrderModalProps
     
     const text = messageLines.join('\n');
     const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text)}`;
+    
+    // Log click analytics
+    logClick('whatsapp_order', product.id);
     
     window.open(url, '_blank');
     onClose();

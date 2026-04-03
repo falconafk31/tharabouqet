@@ -5,19 +5,34 @@ import TestimonialSlider from '@/components/TestimonialSlider'
 import { Promo, Product, Testimonial, Category } from '@/types'
 import { Metadata } from 'next'
 
-// --- SEO METADATA ---
-export const metadata: Metadata = {
-  title: 'Tharabouqet | Fresh Minimalist Florist & Gifts',
-  description: 'Pesan buket bunga segar, kado wisuda, dan hampers eksklusif dengan desain minimalis modern. Pengiriman cepat area Jakarta & sekitarnya.',
-  keywords: ['florist jakarta', 'buket bunga', 'kado wisuda', 'bunga fresh', 'tharabouqet', 'toko bunga'],
-  openGraph: {
-    title: 'Tharabouqet | Fresh Minimalist Florist',
-    description: 'Rangkaian bunga segar untuk setiap momen spesial Anda.',
-    url: 'https://tharabouqet.vercel.app', 
-    siteName: 'Tharabouqet',
-    locale: 'id_ID',
-    type: 'website',
-  },
+export async function generateMetadata(): Promise<Metadata> {
+  const { data } = await supabase.from('store_settings').select('key, value');
+  const settings: Record<string, string> = {};
+  data?.forEach(s => settings[s.key] = s.value);
+
+  const title = settings.seo_title || 'Tharabouqet | Fresh Minimalist Florist & Gifts';
+  const desc = settings.seo_description || 'Pesan buket bunga segar, kado wisuda, dan hampers eksklusif dengan desain minimalis modern.';
+
+  return {
+    title: title,
+    description: desc,
+    keywords: ['florist jakarta', 'buket bunga', 'kado wisuda', 'bunga fresh', 'tharabouqet', 'toko bunga'],
+    openGraph: {
+      title: title,
+      description: desc,
+      url: 'https://tharabouqet.vercel.app', 
+      siteName: 'Tharabouqet',
+      locale: 'id_ID',
+      type: 'website',
+      images: [
+        {
+          url: '/og-image.jpg', // Pastikan file ini ada di public folder nantinya atau gunakan URL dinamis
+          width: 1200,
+          height: 630,
+        }
+      ]
+    },
+  }
 }
 
 export const revalidate = 3600 // Cache untuk 1 jam (ISR) agar tidak boros kuota Supabase

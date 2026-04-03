@@ -7,10 +7,16 @@ import {
   LogOut, Plus, Trash2, X, Image as ImageIcon, Loader2,
   ShoppingBag, Megaphone, MessageSquareQuote, MinusCircle, Pencil,
   UploadCloud, Calculator, Layers, Settings, Save, MapPin, Clock, Share2, Phone,
-  CheckCircle, AlertCircle, ChevronLeft, ChevronRight, Search, Download, Upload, ArrowUpDown, ChevronUp, ChevronDown, Eye
+  CheckCircle, AlertCircle, ChevronLeft, ChevronRight, Search, Download, Upload, ArrowUpDown, ChevronUp, ChevronDown, Eye, Globe
 } from 'lucide-react';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
+import { AnalyticsTab } from './admin/AnalyticsTab';
+import { SettingsTab } from './admin/SettingsTab';
+import { ProductTab } from './admin/ProductTab';
+import { PromoTab } from './admin/PromoTab';
+import { CategoryTab } from './admin/CategoryTab';
+import { TestimonialTab } from './admin/TestimonialTab';
 
 // --- CONSTANTS ---
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
@@ -90,7 +96,7 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
 };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'promos' | 'products' | 'testimonials' | 'categories' | 'settings'>('products');
+  const [activeTab, setActiveTab] = useState<'promos' | 'products' | 'testimonials' | 'categories' | 'settings' | 'analytics'>('products');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
@@ -102,6 +108,7 @@ export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'created_at', direction: 'desc' });
+  const [totalProducts, setTotalProducts] = useState(0);
 
   const [promos, setPromos] = useState<Promo[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -109,8 +116,11 @@ export default function AdminDashboard() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({
     whatsapp_number: '', instagram_url: '', tiktok_url: '',
-    address_line1: '', address_line2: '', hours_weekdays: '', hours_weekends: ''
+    address_line1: '', address_line2: '', hours_weekdays: '', hours_weekends: '',
+    seo_title: '', seo_description: '', seo_keywords: ''
   });
+  const [analyticsData, setAnalyticsData] = useState<{product_id: string, name: string, count: number}[]>([]);
+  const [totalClicks, setTotalClicks] = useState({ orders: 0, shares: 0 });
 
   const [promoForm, setPromoForm] = useState({ title: '', subtitle: '', image_url: '', button_text: 'Lihat Promo', button_link: '#products', discount: '' });
   const [productForm, setProductForm] = useState({
@@ -127,16 +137,58 @@ export default function AdminDashboard() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [promosRes, productsRes, testiRes, catRes, settingsRes] = await Promise.all([
+    
+    // Fetch Settings, Categories, Promos, Testimonials (can be kept simple for now)
+    const [promosRes, testiRes, catRes, settingsRes, totalProductsRes] = await Promise.all([
       supabase.from('promos').select('*').order('created_at', { ascending: false }),
-      supabase.from('products').select('*').order('created_at', { ascending: false }),
       supabase.from('testimonials').select('*').order('created_at', { ascending: false }),
       supabase.from('categories').select('*').order('name', { ascending: true }),
-      supabase.from('store_settings').select('*')
+      supabase.from('store_settings').select('*'),
+      supabase.from('products').select('*', { count: 'exact', head: true })
     ]);
+    
+    if (totalProductsRes.count !== null) setTotalProducts(totalProductsRes.count);
+
+    // Fetch Products with Server-Side Pagination & Search
+    let productQuery = supabase.from('products').select('*', { count: 'exact' });
+    
+    if (searchQuery) {
+      productQuery = productQuery.ilike('name', `%${searchQuery}%`);
+    }
+
+    if (sortConfig.key) {
+      productQuery = productQuery.order(sortConfig.key as any, { ascending: sortConfig.direction === 'asc' });
+    } else {
+      productQuery = productQuery.order('created_at', { ascending: false });
+    }
+
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE - 1;
+    const productsRes = await productQuery.range(start, end);
+
+    // Fetch Analytics
+    const { data: clicks } = await supabase.from('click_analytics').select('*, products(name)');
+    if (clicks) {
+      const orderCount = clicks.filter(c => c.type === 'whatsapp_order').length;
+      const shareCount = clicks.filter(c => c.type === 'whatsapp_share').length;
+      setTotalClicks({ orders: orderCount, shares: shareCount });
+
+      // Group by product
+      const productStats: Record<string, {name: string, count: number}> = {};
+      clicks.forEach(c => {
+        if (!c.product_id) return;
+        if (!productStats[c.product_id]) {
+          productStats[c.product_id] = { name: c.products?.name || 'Unknown', count: 0 };
+        }
+        productStats[c.product_id].count++;
+      });
+      setAnalyticsData(Object.entries(productStats).map(([id, stats]) => ({ product_id: id, ...stats })).sort((a,b) => b.count - a.count));
+    }
 
     if (promosRes.data) setPromos(promosRes.data);
     if (productsRes.data) setProducts(productsRes.data as unknown as Product[]);
+    if (productsRes.count !== null) setTotalProducts(productsRes.count);
+    
     if (testiRes.data) setTestimonials(testiRes.data);
     if (catRes.data) {
       setCategories(catRes.data);
@@ -150,7 +202,7 @@ export default function AdminDashboard() {
       setSettings(prev => ({ ...prev, ...settingsMap }));
     }
     setLoading(false);
-  }, []);
+  }, [currentPage, searchQuery, sortConfig]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -300,6 +352,11 @@ export default function AdminDashboard() {
   };
 
   const getFilteredData = (data: any[]) => {
+    if (activeTab === 'products') {
+        const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
+        return { data: products, totalPages, totalItems: totalProducts };
+    }
+
     let filtered = data;
     if (searchQuery) {
       const lowerQ = searchQuery.toLowerCase();
@@ -309,23 +366,6 @@ export default function AdminDashboard() {
         (item.text && item.text.toLowerCase().includes(lowerQ))
       );
     }
-
-    if (activeTab === 'products' && sortConfig.key) {
-      filtered.sort((a, b) => {
-        if (sortConfig.key === 'price') {
-          return sortConfig.direction === 'asc' ? a.price - b.price : b.price - a.price;
-        } else if (sortConfig.key === 'created_at') {
-          const dateA = new Date(a.created_at || 0).getTime();
-          const dateB = new Date(b.created_at || 0).getTime();
-          return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
-        } else if (sortConfig.key === 'discount') {
-          const getDiscount = (item: any) => item.original_price && item.price ? (item.original_price - item.price) : 0;
-          return sortConfig.direction === 'asc' ? getDiscount(a) - getDiscount(b) : getDiscount(b) - getDiscount(a);
-        }
-        return 0;
-      });
-    }
-
     const totalItems = filtered.length;
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -482,177 +522,71 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          <StatsCard title="Total Products" count={products.length} icon={ShoppingBag} color="bg-rose-500" onClick={() => handleTabChange('products')} />
+          <StatsCard title="Total Products" count={totalProducts} icon={ShoppingBag} color="bg-rose-500" onClick={() => handleTabChange('products')} />
           <StatsCard title="Active Promos" count={promos.length} icon={Megaphone} color="bg-blue-500" onClick={() => handleTabChange('promos')} />
           <StatsCard title="Categories" count={categories.length} icon={Layers} color="bg-orange-500" onClick={() => handleTabChange('categories')} />
           <StatsCard title="Testimonials" count={testimonials.length} icon={MessageSquareQuote} color="bg-green-500" onClick={() => handleTabChange('testimonials')} />
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6 bg-white p-2 rounded-2xl shadow-sm border border-gray-100">
-          {['products', 'promos', 'categories', 'testimonials', 'settings'].map(tab => (
-            <button key={tab} onClick={() => handleTabChange(tab)} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 capitalize ${activeTab === tab ? 'bg-rose-50 text-rose-600 shadow-sm ring-1 ring-rose-200' : 'text-gray-500 hover:bg-gray-50'}`}>
-              {tab === 'promos' && <Megaphone size={16} />}
-              {tab === 'products' && <ShoppingBag size={16} />}
-              {tab === 'categories' && <Layers size={16} />}
-              {tab === 'testimonials' && <MessageSquareQuote size={16} />}
-              {tab === 'settings' && <Settings size={16} />}
-              {tab}
-            </button>
+          {['products', 'promos', 'categories', 'testimonials', 'analytics', 'settings'].map(tab => (
+             <button key={tab} onClick={() => handleTabChange(tab)} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 capitalize ${activeTab === tab ? 'bg-rose-50 text-rose-600 shadow-sm ring-1 ring-rose-200' : 'text-gray-500 hover:bg-gray-50'}`}>
+                {tab === 'promos' && <Megaphone size={16}/>}
+                {tab === 'products' && <ShoppingBag size={16}/>}
+                {tab === 'categories' && <Layers size={16}/>}
+                {tab === 'testimonials' && <MessageSquareQuote size={16}/>}
+                {tab === 'analytics' && <Calculator size={16}/>}
+                {tab === 'settings' && <Settings size={16}/>}
+                {tab}
+             </button>
           ))}
         </div>
 
-        {activeTab !== 'settings' ? (
-          <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50">
-              <div className="relative w-full md:w-96">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input type="text" placeholder={`Search ${activeTab}...`} value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }} className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-rose-500 outline-none shadow-sm" />
-              </div>
-              <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
-                {activeTab === 'products' && (
-                  <>
-                    <button onClick={handleDownloadTemplate} className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 rounded-xl text-sm font-bold transition shadow-sm whitespace-nowrap">
-                      <Download size={16} /> Template
-                    </button>
-                    <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl text-sm font-bold transition shadow-sm whitespace-nowrap">
-                      <Download size={16} /> Export
-                    </button>
-                    <label className={`flex items-center gap-2 px-4 py-2.5 bg-white border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-xl text-sm font-bold transition shadow-sm cursor-pointer whitespace-nowrap ${(uploading || isSubmitting) ? 'opacity-50 pointer-events-none' : ''}`}>
-                      {(uploading || isSubmitting) ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                      {uploadStatus || 'Import .xls'}
-                      <input type="file" accept=".xlsx, .xls" onChange={handleImportExcel} className="hidden" />
-                    </label>
-                  </>
-                )}
-                <button onClick={() => { if (showForm) resetForms(); else setShowForm(true); }} className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold transition shadow-lg hover:bg-slate-800 whitespace-nowrap">
-                  <Plus size={18} /> Add New
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              {loading ? <div className="py-20 text-center text-gray-400"><Loader2 className="animate-spin mx-auto mb-2" /> Loading data...</div> : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                          {activeTab === 'products' && (
-                            <>
-                              <th className="pb-4 w-20">Image</th>
-                              <th className="pb-4">Produk & Kategori</th>
-                              <th className="pb-4 cursor-pointer hover:text-gray-700 transition select-none" onClick={() => handleSort('price')}>
-                                <div className="flex items-center gap-1">Harga {sortConfig.key === 'price' ? (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : <ArrowUpDown size={14} className="opacity-30" />}</div>
-                              </th>
-                              <th className="pb-4 cursor-pointer hover:text-gray-700 transition select-none" onClick={() => handleSort('discount')}>
-                                <div className="flex items-center gap-1">Diskon {sortConfig.key === 'discount' ? (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : <ArrowUpDown size={14} className="opacity-30" />}</div>
-                              </th>
-                              <th className="pb-4 cursor-pointer hover:text-gray-700 transition select-none" onClick={() => handleSort('created_at')}>
-                                <div className="flex items-center gap-1">Tanggal {sortConfig.key === 'created_at' ? (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : <ArrowUpDown size={14} className="opacity-30" />}</div>
-                              </th>
-                              <th className="pb-4 text-right">Actions</th>
-                            </>
-                          )}
-                          {activeTab === 'promos' && <><th className="pb-4">Banner</th><th className="pb-4">Title</th><th className="pb-4">Status</th><th className="pb-4 text-right">Actions</th></>}
-                          {activeTab === 'testimonials' && <><th className="pb-4">Customer</th><th className="pb-4">Rating</th><th className="pb-4">Review</th><th className="pb-4 text-right">Actions</th></>}
-                          {activeTab === 'categories' && <><th className="pb-4">Category Name</th><th className="pb-4 text-right">Actions</th></>}
-                        </tr>
-                      </thead>
-                      <tbody className="text-sm text-gray-700">
-                        {(() => {
-                          const { data, totalPages } = activeTab === 'products' ? getFilteredData(products) : activeTab === 'promos' ? getFilteredData(promos) : activeTab === 'testimonials' ? getFilteredData(testimonials) : getFilteredData(categories);
-                          if (data.length === 0) return <tr><td colSpan={5} className="py-10 text-center text-gray-400">Tidak ada data ditemukan.</td></tr>;
-                          return data.map((item: any) => (
-                            <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50 transition group">
-                              {activeTab === 'products' && (
-                                <>
-                                  <td className="py-4 pr-4 w-20"><div className="w-12 h-12 rounded-lg bg-gray-100 relative overflow-hidden">{(item.image_url || item.images?.[0]) ? <Image src={item.image_url || item.images?.[0]} alt={item.name} fill className="object-cover hover:scale-110 transition-transform" /> : <ImageIcon className="m-auto text-gray-300" size={20} />}</div></td>
-                                  <td className="py-4 pr-4">
-                                    <div className="flex flex-col items-start gap-1.5">
-                                      <span className="font-bold text-gray-900 group-hover:text-rose-600 transition-colors">{item.name}</span>
-                                      <span className="px-2 py-0.5 bg-rose-50 border border-rose-100 text-rose-600 rounded text-[10px] font-bold uppercase tracking-wider">{item.category}</span>
-                                    </div>
-                                  </td>
-                                  <td className="py-4 pr-4">
-                                    <div className="flex flex-col">
-                                      <span className="font-bold text-gray-900">Rp {item.price.toLocaleString()}</span>
-                                      {item.original_price && <span className="text-xs text-rose-500 line-through">Rp {item.original_price.toLocaleString()}</span>}
-                                    </div>
-                                  </td>
-                                  <td className="py-4 pr-4">
-                                    {item.discount ? (
-                                      <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold border border-green-100 shadow-sm">{item.discount}</span>
-                                    ) : <span className="text-gray-300">-</span>}
-                                  </td>
-                                  <td className="py-4 pr-4 text-xs text-gray-500 font-medium">
-                                    {item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
-                                  </td>
-                                </>
-                              )}
-                              {activeTab === 'promos' && (
-                                <>
-                                  <td className="py-4 pr-4 w-32"><div className="w-24 h-12 rounded-lg bg-gray-100 relative overflow-hidden"><Image src={item.image_url} alt={item.title} fill className="object-cover" /></div></td>
-                                  <td className="py-4 pr-4"><p className="font-bold text-gray-900">{item.title}</p><p className="text-xs text-gray-500">{item.subtitle}</p></td>
-                                  <td className="py-4 pr-4"><span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">Active</span></td>
-                                </>
-                              )}
-                              {activeTab === 'testimonials' && (
-                                <>
-                                  <td className="py-4 pr-4 font-medium">{item.name}</td>
-                                  <td className="py-4 pr-4 text-yellow-500 font-bold">{'★'.repeat(item.rating)}</td>
-                                  <td className="py-4 pr-4 text-gray-500 italic truncate max-w-xs">"{item.text}"</td>
-                                </>
-                              )}
-                              {activeTab === 'categories' && <td className="py-4 pr-4 font-bold text-gray-800">{item.name}</td>}
-                              <td className="py-4 text-right">
-                                {/* Action Bar: Selalu tampil di Mobile, Ghost-Hover aktif khusus Desktop */}
-                                <div className="flex items-center justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 md:translate-x-2 md:group-hover:translate-x-0">
-                                  {activeTab === 'products' && (
-                                    <Link href={`/product/${item.id}`} target="_blank" className="p-2 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition relative group/btn" title="Lihat di Web">
-                                      <Eye size={16} />
-                                    </Link>
-                                  )}
-                                  {activeTab !== 'categories' && (
-                                    <button onClick={() => handleEdit(item, activeTab)} className="p-2 rounded-lg text-blue-600 bg-blue-50 hover:bg-blue-100 transition relative group/btn" title="Edit">
-                                      <Pencil size={16} />
-                                    </button>
-                                  )}
-                                  <button onClick={() => handleDelete(activeTab, item.id)} className="p-2 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition relative group/btn" title="Hapus">
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ));
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                  {(() => { const { totalPages } = activeTab === 'products' ? getFilteredData(products) : activeTab === 'promos' ? getFilteredData(promos) : activeTab === 'testimonials' ? getFilteredData(testimonials) : { totalPages: 0 }; return <PaginationControls totalPages={totalPages} />; })()}
-                </>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100 mb-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2"><Settings className="text-slate-500" /> Pengaturan Toko</h2>
-            <form onSubmit={submitSettings} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-6">
-                <h3 className="font-bold text-gray-800 border-b pb-2">Kontak & Sosmed</h3>
-                <div><label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><Phone size={14} /> Nomor WhatsApp</label><input value={settings.whatsapp_number || ''} onChange={e => setSettings({ ...settings, whatsapp_number: e.target.value })} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="6281234567890" required /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><Share2 size={14} /> Instagram URL</label><input value={settings.instagram_url || ''} onChange={e => setSettings({ ...settings, instagram_url: e.target.value })} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="https://instagram.com/..." /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><Share2 size={14} /> TikTok URL</label><input value={settings.tiktok_url || ''} onChange={e => setSettings({ ...settings, tiktok_url: e.target.value })} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="https://tiktok.com/..." /></div>
-              </div>
-              <div className="space-y-6">
-                <h3 className="font-bold text-gray-800 border-b pb-2">Lokasi & Jam Operasional</h3>
-                <div><label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><MapPin size={14} /> Alamat Baris 1</label><input value={settings.address_line1 || ''} onChange={e => setSettings({ ...settings, address_line1: e.target.value })} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Jl. Mawar No. 123" /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><MapPin size={14} /> Alamat Baris 2</label><input value={settings.address_line2 || ''} onChange={e => setSettings({ ...settings, address_line2: e.target.value })} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Jakarta Selatan, 12345" /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><Clock size={14} /> Jam Kerja (Weekdays)</label><input value={settings.hours_weekdays || ''} onChange={e => setSettings({ ...settings, hours_weekdays: e.target.value })} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Mon - Sat: 09:00 - 17:00" /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><Clock size={14} /> Jam Kerja (Weekend)</label><input value={settings.hours_weekends || ''} onChange={e => setSettings({ ...settings, hours_weekends: e.target.value })} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900" placeholder="Sun: Closed" /></div>
-              </div>
-              <div className="md:col-span-2"><button type="submit" disabled={isSubmitting} className="flex items-center justify-center gap-2 bg-green-600 text-white w-full py-4 rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-100">{isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />} Simpan Pengaturan</button></div>
-            </form>
-          </div>
+        {/* REFACTORED CONTENT AREA */}
+        {activeTab === 'products' && (
+          <ProductTab 
+            products={products} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+            setCurrentPage={setCurrentPage} handleDownloadTemplate={handleDownloadTemplate}
+            handleExportExcel={handleExportExcel} handleImportExcel={handleImportExcel}
+            uploading={uploading} isSubmitting={isSubmitting} uploadStatus={uploadStatus}
+            showForm={showForm} setShowForm={setShowForm} resetForms={resetForms}
+            loading={loading} sortConfig={sortConfig} handleSort={handleSort}
+            getFilteredData={getFilteredData} handleEdit={handleEdit} handleDelete={handleDelete}
+            PaginationControls={PaginationControls}
+          />
+        )}
+        {activeTab === 'promos' && (
+          <PromoTab 
+            promos={promos} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+            setCurrentPage={setCurrentPage} showForm={showForm} setShowForm={setShowForm}
+            resetForms={resetForms} loading={loading} getFilteredData={getFilteredData}
+            handleEdit={handleEdit} handleDelete={handleDelete} PaginationControls={PaginationControls}
+          />
+        )}
+        {activeTab === 'categories' && (
+          <CategoryTab 
+            categories={categories} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+            setCurrentPage={setCurrentPage} showForm={showForm} setShowForm={setShowForm}
+            resetForms={resetForms} loading={loading} getFilteredData={getFilteredData}
+            handleDelete={handleDelete} PaginationControls={PaginationControls}
+          />
+        )}
+        {activeTab === 'testimonials' && (
+          <TestimonialTab 
+            testimonials={testimonials} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+            setCurrentPage={setCurrentPage} showForm={showForm} setShowForm={setShowForm}
+            resetForms={resetForms} loading={loading} getFilteredData={getFilteredData}
+            handleEdit={handleEdit} handleDelete={handleDelete} PaginationControls={PaginationControls}
+          />
+        )}
+        {activeTab === 'analytics' && (
+          <AnalyticsTab totalClicks={totalClicks} analyticsData={analyticsData} />
+        )}
+        {activeTab === 'settings' && (
+          <SettingsTab 
+            settings={settings} setSettings={setSettings} 
+            isSubmitting={isSubmitting} submitSettings={submitSettings} 
+          />
         )}
 
         <Modal isOpen={showForm && activeTab !== 'settings'} onClose={resetForms} title={editingId ? `Edit ${activeTab.slice(0, -1)}` : `Add New ${activeTab.slice(0, -1)}`}>

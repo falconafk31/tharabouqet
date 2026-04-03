@@ -8,6 +8,7 @@ import Link from 'next/link';
 import OrderModal from '@/components/OrderModal';
 import ProductCard from '@/components/ProductCard';
 import Image from 'next/image';
+import { logClick } from '@/lib/analytics';
 
 // --- CUSTOM SOCIAL ICONS ---
 const XIcon = ({ size = 20, className = "" }) => (
@@ -71,6 +72,7 @@ export default function ProductDetailClient({ initialProduct, initialRelated }: 
     } else if (platform === 'twitter') {
       window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
     } else if (platform === 'whatsapp') {
+      logClick('whatsapp_share', product.id);
       window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
     } else if (platform === 'instagram' || platform === 'tiktok') {
       // Logic Khusus IG & TikTok: Copy Link + Info User
@@ -202,7 +204,10 @@ export default function ProductDetailClient({ initialProduct, initialRelated }: 
             {/* ACTION BUTTONS */}
             <div className="flex flex-col gap-4 mb-8">
               <button 
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => {
+                  logClick('whatsapp_order', product.id);
+                  setIsModalOpen(true);
+                }}
                 className="w-full bg-green-600 hover:bg-green-700 text-white py-4 px-8 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition shadow-lg shadow-green-100 transform active:scale-[0.98]"
               >
                 <MessageCircle size={24} />
